@@ -3,8 +3,8 @@ module Overture.Data.Nat.Properties where
 open import Data.Nat
 open import Data.Nat.Properties
 open import Data.Nat.Combinatorics
-open import Data.Nat.Divisibility
 open import Data.Nat.Primality
+open import Data.Nat.Divisibility
 open import Data.Nat.DivMod
 
 open import Data.Sum using (inj₁; inj₂)
