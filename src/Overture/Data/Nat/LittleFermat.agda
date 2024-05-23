@@ -90,9 +90,9 @@ hs-dream {p} a prime[p] with prime⇒p∣∑ a prime[p]
     ∎
 
 theorem : ∀ {p} a → Prime p → ∃[ k ] a ^ p ≡ a + k * p
-theorem zero is-prime = 0 , nonZero⇒0^n≡0 ⦃ prime⇒nonZero is-prime ⦄
-theorem {p} (suc a) is-prime with theorem a is-prime | hs-dream a is-prime
-theorem {p} (suc a) is-prime | k₁ , prf₁ | k₂ , prf₂ = k₁ + k₂ , eq where
+theorem zero prime[p] = 0 , nonZero⇒0^n≡0 ⦃ prime⇒nonZero prime[p] ⦄
+theorem {p} (suc a) prime[p] with theorem a prime[p] | hs-dream a prime[p]
+theorem {p} (suc a) prime[p] | k₁ , prf₁ | k₂ , prf₂ = k₁ + k₂ , eq where
   eq : (suc a) ^ p ≡ suc a + (k₁ + k₂) * p
   eq =
     begin
