@@ -1,4 +1,3 @@
-
 module Overture.Data.Fin where
 
 open import Data.Fin using (Fin; suc; zero)
