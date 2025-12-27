@@ -1,0 +1,65 @@
+module Overture.Algebra.CategoryTheory.Applicative where
+
+open import Level using (Level; suc; _⊔_)
+open import Function.Base using (id; _∘_)
+open import Effect.Applicative using (RawApplicative)
+open import Relation.Binary.PropositionalEquality
+open Relation.Binary.PropositionalEquality.≡-Reasoning
+
+open import Overture.Algebra.CategoryTheory.Functor as Functor using (IsFunctor; Functor)
+
+private
+  variable
+    ℓ ℓ′ : Level
+
+record IsApplicative
+  (F : Set ℓ → Set ℓ′)
+  (pure : ∀ {A} → A → F A)
+  (_<*>_ : ∀ {A B} → F (A → B) → F A → F B) : Set (suc ℓ ⊔ ℓ′) where
+  field
+    identity : ∀ {A} {x : F A} →
+      pure id <*> x ≡ x
+    homomorphism : ∀ {A B} {f : A → B} {x} →
+      pure f <*> pure x ≡ pure (f x)
+    interchange : ∀ {A B} {u : F (A → B)} {y} →
+      u <*> pure y ≡ pure (λ f → f y) <*> u
+    composition : ∀ {A B C} {u : F (B → C)} {v : F (A → B)} {w : F A} →
+      ((pure (λ f g x → f (g x)) <*> u) <*> v) <*> w ≡ u <*> (v <*> w)
+
+  functor : Functor F
+  functor = record { _<$>_ = _<$>_ ; isFunctor = isFunctor } where
+    _<$>_ : ∀ {A B} → (A → B) → F A → F B
+    f <$> x = pure f <*> x
+
+    isFunctor : IsFunctor F _<$>_
+    isFunctor = record { identity = identity′ ; composition = composition′ } where
+      identity′ :  ∀ {A} {x : F A} →
+        (id <$> x) ≡ x
+      identity′ = identity
+
+      composition′ : ∀ {A B C} {f : B → C} {g : A → B} {x : F A} →
+        ((f ∘ g) <$> x) ≡ (f <$> (g <$> x))
+      composition′ {f = f} {g = g} {x = x} =
+        begin
+          pure (f ∘ g) <*> x
+        ≡⟨ cong (λ z → z <*> x) (sym homomorphism) ⟩
+          ((pure (λ g x → f (g x))) <*> pure g) <*> x
+        ≡⟨ cong (λ z → (z <*> pure g) <*> x) (sym homomorphism) ⟩
+          ((pure (λ f g x → f (g x)) <*> pure f) <*> pure g) <*> x
+        ≡⟨ composition ⟩
+          pure f <*> (pure g <*> x)
+        ∎
+
+record Applicative (F : Set ℓ → Set ℓ′) : Set (suc ℓ ⊔ ℓ′) where
+  infixl 4 _<*>_
+  field
+    functor : Functor F
+    pure : ∀ {A} → A → F A
+    _<*>_ : ∀ {A B} → F (A → B) → F A → F B
+    isApplicative : IsApplicative F pure _<*>_
+
+  rawApplicative : RawApplicative F
+  rawApplicative = record { rawFunctor = (Functor.rawFunctor functor) ; pure = pure ; _<*>_ = _<*>_ }
+
+  open Functor.Functor functor public
+  open IsApplicative isApplicative public hiding (functor)

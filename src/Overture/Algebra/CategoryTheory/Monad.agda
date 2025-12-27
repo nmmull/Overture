@@ -1,0 +1,67 @@
+open import Axiom.Extensionality.Propositional using (Extensionality)
+
+module Overture.Algebra.CategoryTheory.Monad
+  (extensionality : ∀ {ℓ₁ ℓ₂} → Extensionality ℓ₁ ℓ₂) where
+
+open import Level using (Level; suc; _⊔_)
+open import Function.Base using (id; _∘_)
+open import Effect.Monad using (RawMonad)
+open import Relation.Binary.PropositionalEquality
+open Relation.Binary.PropositionalEquality.≡-Reasoning
+
+open import Overture.Algebra.CategoryTheory.Functor as Functor using (Functor; IsFunctor)
+open import Overture.Algebra.CategoryTheory.Applicative as Applicative using (Applicative; IsApplicative)
+
+private
+  variable
+    ℓ ℓ′ ℓ′′ : Level
+
+record MonadLaws
+  (F : Set ℓ → Set ℓ′)
+  (pure : ∀ {A} → A → F A)
+  (_>>=_ : ∀ {A B} → F A → (A → F B) → F B) : Set (suc ℓ ⊔ ℓ′) where
+  field
+    identityˡ :
+      ∀ {A B} {a} {h : A → F B} →
+      pure a >>= h ≡ h a
+    identityʳ :
+      ∀ {A} {m : F A} →
+      m >>= pure ≡ m
+    associativity :
+      ∀ {A B C} {m} {g : C → F A} {h : A → F B} →
+      (m >>= g) >>= h ≡ m >>= (λ x → (g x) >>= h)
+
+  functor : Functor F
+  functor = record { _<$>_ = _<$>_ ; isFunctor = isFunctor } where
+    _<$>_ : ∀ {A B} → (A → B) → F A → F B
+    f <$> x = x >>= (pure ∘ f)
+
+    isFunctor : IsFunctor F _<$>_
+    isFunctor = record { identity = identity ; composition = composition } where
+      identity :  ∀ {A} {x : F A} →
+        (id <$> x) ≡ x
+      identity = identityʳ
+
+      composition : ∀ {A B C} {f : B → C} {g : A → B} {x : F A} →
+        ((f ∘ g) <$> x) ≡ (f <$> (g <$> x))
+      composition {f = f} {g = g} {x = x} =
+        begin
+          x  >>= (pure ∘ f ∘ g)
+        ≡⟨ cong (λ f → x >>= f) (extensionality (λ z → sym identityˡ)) ⟩
+          x >>= (λ y → pure (g y) >>= (pure ∘ f))
+        ≡⟨ sym associativity ⟩
+          (x >>= (pure ∘ g)) >>= (pure ∘ f)
+        ∎
+
+record Monad (F : Set ℓ → Set ℓ′) : Set (suc ℓ ⊔ ℓ′) where
+  infixl 1 _>>=_
+  field
+    applicative : Applicative F
+    _>>=_ : ∀ {A B} → F A → (A → F B) → F B
+    isMonad : MonadLaws F (Applicative.pure applicative) _>>=_
+
+  rawMonad : RawMonad F
+  rawMonad = record { rawApplicative = Applicative.rawApplicative applicative ; _>>=_ = _>>=_ }
+
+  open Applicative.Applicative applicative public
+  open MonadLaws isMonad public hiding (functor)
