@@ -72,3 +72,5 @@ prime⇒p∣pCk {p} {k} prime[p] k<p = p∣pCk where
   ≡⟨ [m+kn]%n≡m%n b k c ⟩
     b % c
   ∎
+
+open import Data.Nat.Properties public
