@@ -123,7 +123,7 @@ data _⊢_⦂_ : Ctxt n → Rel (Expr n) ℓ0
 
 data WF where
   []-wf : WF []
-  ∷-wf : ∀ (Γ : Ctxt n) a i → Γ ⊢ a ⦂ 𝑠 i → WF (a ∷ Γ)
+  ∷-wf : ∀ {i a} (Γ : Ctxt n) → Γ ⊢ a ⦂ 𝑠 i → WF (a ∷ Γ)
 
 data _⊢_⦂_ where
   axiom :
@@ -133,7 +133,7 @@ data _⊢_⦂_ where
     Γ ⊢ 𝑠 i ⦂ 𝑠 j
 
   𝑣-intro :
-    ∀ {Γ : Ctxt n} {i} →
+    ∀ {Γ : Ctxt n} i →
     WF Γ →
     Γ ⊢ 𝑣 i ⦂ lookup' Γ i
 
@@ -172,19 +172,71 @@ data _⊢_⦂_ where
     c ⟶ᵇ b →
     Γ ⊢ a ⦂ c
 
-shift' : ∀ k p → ExtCtxt (k + n) m → ExtCtxt (k + (p + n)) m
-shift' = {!!}
+shift' : ∀ p → ExtCtxt n m → ExtCtxt (p + n) m
+shift' p [] = []
+shift' {m} {suc n} p (a ∷ Γ) = shift n p a ∷ shift' p Γ
 
 module Properties where
+
+
+  ctxt-thinning :
+    {c : Expr n}
+    {Δ : ExtCtxt n m}
+    {Γ : Ctxt n} →
+    WF (Δ ++ Γ) →
+    WF (c ∷ Γ) →
+    WF ((shift' 1 Δ) ++ (c ∷ Γ))
 
   thinning :
     {a b : Expr (m + n)}
     {c : Expr n}
     {Δ : ExtCtxt n m}
     {Γ : Ctxt n} →
+    WF (c ∷ Γ) →
     (Δ ++ Γ) ⊢ a ⦂ b →
-    ((shift' 0 1 Δ) ++ (c ∷ Γ)) ⊢ shift m 1 a ⦂ shift m 1 b
-  thinning = {!!}
+    ((shift' 1 Δ) ++ (c ∷ Γ)) ⊢ shift m 1 a ⦂ shift m 1 b
+
+  ctxt-thinning {Δ = []} _ wf-cΓ = wf-cΓ
+  ctxt-thinning {m} {suc n} {c} {a ∷ Δ} {Γ} (∷-wf {i = i} .(Δ ++ Γ) ⊢a) wf-cΓ
+    = ∷-wf (shift' 1 Δ ++ (c ∷ Γ)) (thinning wf-cΓ ⊢a)
+
+  lemma2 :
+    (i : Fin (m + n))
+    (c : Expr n)
+    (Δ : ExtCtxt n m)
+    (Γ : Ctxt n) →
+    lookup' (shift' 1 Δ ++ (c ∷ Γ)) (Fin.shift m 1 i) ≡ shift m 1 (lookup' (Δ ++ Γ) i)
+  lemma2 = {!!}
+
+  lemma3 :
+    (a : Expr (suc (m + n)))
+    (b : Expr (m + n)) →
+    shift m 1 (a /⁰ b) ≡ shift (suc m) 1 a /⁰ shift m 1 b
+  lemma3 = {!!}
+
+  lemma4 :
+    {a : Expr (m + n)}
+    {b : Expr (m + n)} →
+    a ⟶ᵇ b →
+    shift m 1 a ⟶ᵇ shift m 1 b
+  lemma4 = {!!}
+
+  thinning wf-cΓ (axiom ax wf-ΔΓ) =
+    axiom ax (ctxt-thinning wf-ΔΓ wf-cΓ)
+  thinning {m = m} {c = c} {Δ = Δ} {Γ = Γ} wf-cΓ (𝑣-intro i wf-ΓΔ)
+    rewrite sym (lemma2 i c Δ Γ) =
+    𝑣-intro (Fin.shift m 1 i) (ctxt-thinning wf-ΓΔ wf-cΓ)
+  thinning wf-cΓ (Π-intro r ⊢a ⊢b) =
+    Π-intro r (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢b)
+  thinning wf-cΓ (abstr r ⊢a ⊢b ⊢c) =
+    abstr r (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢b) (thinning wf-cΓ ⊢c)
+  thinning {m} {n} wf-cΓ (app {b = b} {d = d} ⊢a ⊢b)
+    rewrite lemma3 {m} {n} d b =
+    app (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢b)
+  thinning wf-cΓ (conv-red ⊢a ⊢c red) =
+    conv-red (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢c) (lemma4 red)
+  thinning wf-cΓ (conv-exp ⊢a ⊢c exp) =
+    conv-exp (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢c) (lemma4 exp)
 
   substitution :
     {a b : Expr m}
