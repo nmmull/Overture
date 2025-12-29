@@ -1,4 +1,4 @@
-module Overture.Typing.Stlc where
+module Overture.Typing.STLC where
 
 open import Overture.Data.Fin as Fin using (Fin; zero; suc)
 open import Data.Fin.Substitution using (Sub)
@@ -37,7 +37,7 @@ lookup-vars {n} i
   rewrite lookup-allFin i = refl
 
 _/⁰_ : ∀ {n} → Expr (suc n) → Expr n → Expr n
-_/⁰_ {n} e₁ e₂ = e₁ / (e₂ ∷ vars)
+e₁ /⁰ e₂ = e₁ / (e₂ ∷ vars)
 
 infix 5 _⟶_
 data _⟶_ {n : ℕ} : Expr n → Expr n → Set where
