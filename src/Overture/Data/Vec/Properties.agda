@@ -18,7 +18,7 @@ lookup-shift :
   (u : Vec A m)
   (v : Vec A n)
   (i : Fin (m + n)) →
-  lookup (u ++ v) i ≡ lookup (u ++ (x ∷ v)) (shift m 1 i)
+  lookup (u ++ (x ∷ v)) (shift m 1 i) ≡ lookup (u ++ v) i
 lookup-shift x [] v i = refl
 lookup-shift x (_ ∷ _) _ zero = refl
 lookup-shift x (_ ∷ xs) v (suc i) = lookup-shift x xs v i

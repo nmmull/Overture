@@ -2,10 +2,11 @@ open import Overture.Typing.PTS.Specification using (Spec)
 
 module Overture.Typing.PTS.Base (𝒮 : Spec) where
 
-open import Overture.Data.Fin as Fin using (Fin; zero; suc)
-open import Data.Fin.Properties using (toℕ-fromℕ; toℕ-inject₁)
+open import Overture.Data.Fin as Fin using (Fin; zero; suc; toℕ; opposite)
+open import Overture.Data.Fin.Properties using (toℕ-fromℕ; toℕ-inject₁; toℕ-opposite)
 open import Data.Fin.Substitution using (Sub)
 open import Data.Nat using (ℕ; suc; _+_)
+open import Overture.Data.PVec as PVec using (PVec; PVecExt; []; _∷_; _++_)
 open import Data.Vec as Vec using (Vec; []; _∷_)
 open import Relation.Unary using (Pred)
 open import Relation.Binary using (Rel)
@@ -17,27 +18,30 @@ private
     ℓ : Level
     m n : ℕ
 
-infix 25 λ̂_·_
-infix 25 Π_·_
-data Expr (n : ℕ) : Set where
-  𝑠 : Spec.Sort 𝒮 → Expr n
-  𝑣 : Fin n → Expr n
-  λ̂_·_ : Expr n → Expr (suc n) → Expr n
-  Π_·_ : Expr n → Expr (suc n) → Expr n
-  _§_ : Expr n → Expr n → Expr n
+module Expr where
+  infix 25 λ̂_·_
+  infix 25 Π_·_
+  data Expr (n : ℕ) : Set where
+    𝑠 : Spec.Sort 𝒮 → Expr n
+    𝑣 : Fin n → Expr n
+    λ̂_·_ : Expr n → Expr (suc n) → Expr n
+    Π_·_ : Expr n → Expr (suc n) → Expr n
+    _§_ : Expr n → Expr n → Expr n
 
-shift : ∀ m p → Expr (m + n) → Expr (m + (p + n))
-shift m p (𝑠 i) = 𝑠 i
-shift m p (𝑣 i) = 𝑣 (Fin.shift m p i)
-shift m p (λ̂ a · b) =  λ̂ (shift m p a) · (shift (suc m) p b)
-shift m p (Π a · b) = Π (shift m p a) · (shift (suc m) p b)
-shift m p (a § b) = (shift m p a) § (shift m p b)
+  shift : ∀ m p → Expr (m + n) → Expr (m + (p + n))
+  shift m p (𝑠 i) = 𝑠 i
+  shift m p (𝑣 i) = 𝑣 (Fin.shift m p i)
+  shift m p (λ̂ a · b) =  λ̂ (shift m p a) · (shift (suc m) p b)
+  shift m p (Π a · b) = Π (shift m p a) · (shift (suc m) p b)
+  shift m p (a § b) = (shift m p a) § (shift m p b)
+
+open Expr hiding (shift)
 
 _/_ : Expr m → Sub Expr m n → Expr n
 𝑠 i / ρ = 𝑠 i
 𝑣 i / ρ = Vec.lookup ρ i
-λ̂ a · b / ρ = λ̂ (a / ρ) · (b / (𝑣 zero ∷ Vec.map (shift 0 1) ρ))
-Π a · b / ρ = Π (a / ρ) · (b / (𝑣 zero ∷ Vec.map (shift 0 1) ρ))
+λ̂ a · b / ρ = λ̂ (a / ρ) · (b / (𝑣 zero ∷ Vec.map (Expr.shift 0 1) ρ))
+Π a · b / ρ = Π (a / ρ) · (b / (𝑣 zero ∷ Vec.map (Expr.shift 0 1) ρ))
 (e₁ § e₂) / ρ = (e₁ / ρ) § (e₂ / ρ)
 
 vars : Sub Expr n n
@@ -76,47 +80,34 @@ data _⟶ᵇ_ : Rel (Expr n) ℓ0 where
     b ⟶ᵇ b' →
     a § b ⟶ᵇ a § b'
 
--- Ctxt : Pred ℕ ℓ0
--- Ctxt n = Vec (Expr n) n
+module Ctxt where
+  Ctxt : ℕ → Set
+  Ctxt n = PVec Expr n
 
--- data WF : Ctxt n → Set
+  CtxtExt : ℕ → ℕ → Set
+  CtxtExt m n = PVecExt Expr m n
 
--- data _⊢_⦂_ : Ctxt n → Expr n → Expr n → Set
+  lookup : Ctxt n → Fin n → Expr n
+  lookup {n = suc n} Γ i =
+    resp Expr
+      (cong suc (toℕ-opposite i)) (Expr.shift 0 (suc (toℕ i))
+      (PVec.lookup Γ i))
 
--- data WF where
---   wf-[] : WF []
---   wf-∷ : (a : Expr n) → (i : Spec.Sort 𝒮) → (Γ : Ctxt n) → Γ ⊢ a ⦂ 𝑠 i → WF (a ∷ Γ)
+  shift : ∀ k → CtxtExt n m → CtxtExt (k + n) m
+  shift k = PVec.map (λ i → Expr.shift i k)
 
--- data _⊢_⦂_ where
---   axiom : ∀{i j} {Γ : Ctxt n} →
---     WF Γ →
---     Spec.axiom 𝒮 i j →
---     Γ ⊢ 𝑠 i ⦂ 𝑠 j
+  lookup-shift :
+    (i : Fin (m + n))
+    (c : Expr n)
+    (Δ : CtxtExt n m)
+    (Γ : Ctxt n) →
+    lookup (shift 1 Δ ++ (c ∷ Γ)) (Fin.shift m 1 i) ≡ Expr.shift m 1 (lookup (Δ ++ Γ) i)
+  lookup-shift {.ℕ.zero} {.(suc _)} zero c [] Γ = {!!}
+  lookup-shift {.ℕ.zero} {.(suc _)} (suc i) c [] Γ = {!!}
+  lookup-shift {.(suc _)} {n} i c (x ∷ Δ) Γ = {!!}
 
-infixr 5 _∷_
-data PVec (P : Pred ℕ ℓ) : ℕ → Set ℓ where
-  [] : PVec P 0
-  _∷_ : P n → PVec P n → PVec P (suc n)
 
-lookup : ∀ {P : Pred ℕ ℓ} → PVec P n → (i : Fin n) → P (Fin.toℕ (Fin.opposite i))
-lookup {n = suc n} (x ∷ _) zero rewrite toℕ-fromℕ n = x
-lookup {n = suc n} (_ ∷ v) (suc i) rewrite toℕ-inject₁ (Fin.opposite i) = lookup v i
-
-_++_ : ∀ {P : Pred ℕ ℓ} → PVec (λ k → P (k + n)) m → PVec P n → PVec P (m + n)
-[] ++ v = v
-(x ∷ u) ++ v = x ∷ (u ++ v)
-
-Ctxt : ℕ → Set
-Ctxt n = PVec Expr n
-
-ExtCtxt : ℕ → ℕ → Set
-ExtCtxt m n = PVec (λ k → Expr (k + m)) n
-
-lemma : ∀ (i : Fin n) → Fin.toℕ i + Fin.toℕ (Fin.opposite i) ≡ n
-lemma = {!!}
-
-lookup' : Ctxt n → Fin n → Expr n
-lookup' {n} Γ i = resp Expr (lemma i) (shift 0 (Fin.toℕ i) (lookup Γ i))
+open Ctxt hiding (lookup; shift)
 
 data WF : Pred (Ctxt n) ℓ0
 data _⊢_⦂_ : Ctxt n → Rel (Expr n) ℓ0
@@ -135,7 +126,7 @@ data _⊢_⦂_ where
   𝑣-intro :
     ∀ {Γ : Ctxt n} i →
     WF Γ →
-    Γ ⊢ 𝑣 i ⦂ lookup' Γ i
+    Γ ⊢ 𝑣 i ⦂ Ctxt.lookup Γ i
 
   Π-intro :
     ∀ {i j k a b} {Γ : Ctxt n} →
@@ -172,53 +163,47 @@ data _⊢_⦂_ where
     c ⟶ᵇ b →
     Γ ⊢ a ⦂ c
 
-shift' : ∀ p → ExtCtxt n m → ExtCtxt (p + n) m
-shift' p [] = []
-shift' {m} {suc n} p (a ∷ Γ) = shift n p a ∷ shift' p Γ
-
 module Properties where
-
-
   ctxt-thinning :
     {c : Expr n}
-    {Δ : ExtCtxt n m}
+    {Δ : CtxtExt n m}
     {Γ : Ctxt n} →
     WF (Δ ++ Γ) →
     WF (c ∷ Γ) →
-    WF ((shift' 1 Δ) ++ (c ∷ Γ))
+    WF ((Ctxt.shift 1 Δ) ++ (c ∷ Γ))
 
   thinning :
     {a b : Expr (m + n)}
     {c : Expr n}
-    {Δ : ExtCtxt n m}
+    {Δ : CtxtExt n m}
     {Γ : Ctxt n} →
     WF (c ∷ Γ) →
     (Δ ++ Γ) ⊢ a ⦂ b →
-    ((shift' 1 Δ) ++ (c ∷ Γ)) ⊢ shift m 1 a ⦂ shift m 1 b
+    ((Ctxt.shift 1 Δ) ++ (c ∷ Γ)) ⊢ Expr.shift m 1 a ⦂ Expr.shift m 1 b
 
   ctxt-thinning {Δ = []} _ wf-cΓ = wf-cΓ
-  ctxt-thinning {m} {suc n} {c} {a ∷ Δ} {Γ} (∷-wf {i = i} .(Δ ++ Γ) ⊢a) wf-cΓ
-    = ∷-wf (shift' 1 Δ ++ (c ∷ Γ)) (thinning wf-cΓ ⊢a)
+  ctxt-thinning {_} {suc n} {c} {a ∷ Δ} {Γ} (∷-wf {i = i} .(Δ ++ Γ) ⊢a) wf-cΓ =
+    ∷-wf (Ctxt.shift 1 Δ ++ (c ∷ Γ)) (thinning wf-cΓ ⊢a)
 
   lemma2 :
     (i : Fin (m + n))
     (c : Expr n)
-    (Δ : ExtCtxt n m)
+    (Δ : CtxtExt n m)
     (Γ : Ctxt n) →
-    lookup' (shift' 1 Δ ++ (c ∷ Γ)) (Fin.shift m 1 i) ≡ shift m 1 (lookup' (Δ ++ Γ) i)
+    Ctxt.lookup (Ctxt.shift 1 Δ ++ (c ∷ Γ)) (Fin.shift m 1 i) ≡ Expr.shift m 1 (Ctxt.lookup (Δ ++ Γ) i)
   lemma2 = {!!}
 
   lemma3 :
     (a : Expr (suc (m + n)))
     (b : Expr (m + n)) →
-    shift m 1 (a /⁰ b) ≡ shift (suc m) 1 a /⁰ shift m 1 b
+    Expr.shift m 1 (a /⁰ b) ≡ Expr.shift (suc m) 1 a /⁰ Expr.shift m 1 b
   lemma3 = {!!}
 
   lemma4 :
     {a : Expr (m + n)}
     {b : Expr (m + n)} →
     a ⟶ᵇ b →
-    shift m 1 a ⟶ᵇ shift m 1 b
+    Expr.shift m 1 a ⟶ᵇ Expr.shift m 1 b
   lemma4 = {!!}
 
   thinning wf-cΓ (axiom ax wf-ΔΓ) =
@@ -243,7 +228,7 @@ module Properties where
     {ρ : Sub Expr m n}
     {Γ : Ctxt m}
     {Δ : Ctxt n} →
-    (∀ (i : Fin m) → Δ ⊢ Vec.lookup ρ i ⦂ (lookup' Γ i / ρ)) →
+    (∀ (i : Fin m) → Δ ⊢ Vec.lookup ρ i ⦂ (Ctxt.lookup Γ i / ρ)) →
     Γ ⊢ a ⦂ b →
     Δ ⊢ (a / ρ) ⦂ (b / ρ)
   substitution = {!!}

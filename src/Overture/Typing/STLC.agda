@@ -39,19 +39,19 @@ lookup-vars {n} i
 _/⁰_ : ∀ {n} → Expr (suc n) → Expr n → Expr n
 e₁ /⁰ e₂ = e₁ / (e₂ ∷ vars)
 
-infix 5 _⟶_
-data _⟶_ {n : ℕ} : Expr n → Expr n → Set where
+infix 5 _⟶ᵇ_
+data _⟶ᵇ_ {n : ℕ} : Expr n → Expr n → Set where
   β-red : (e₁ : Expr (suc n)) → (e₂ : Expr n) →
-    (λ̂ e₁) · e₂ ⟶ e₁ /⁰ e₂
+    (λ̂ e₁) · e₂ ⟶ᵇ e₁ /⁰ e₂
   λ̂-red : ∀ {e₁ e₂} →
-    e₁ ⟶ e₂ →
-    λ̂ e₁ ⟶ λ̂ e₂
+    e₁ ⟶ᵇ e₂ →
+    λ̂ e₁ ⟶ᵇ λ̂ e₂
   ·ˡ-red : ∀ {e₁ e₂ e} →
-    e₁ ⟶ e₂ →
-    e₁ · e ⟶ e₂ · e
+    e₁ ⟶ᵇ e₂ →
+    e₁ · e ⟶ᵇ e₂ · e
   ·ʳ-red : ∀ {e₁ e₂ e} →
-    e₁ ⟶ e₂ →
-    e · e₁ ⟶ e · e₂
+    e₁ ⟶ᵇ e₂ →
+    e · e₁ ⟶ᵇ e · e₂
 
 infixr 25 _→̂_
 data Type : Set where
@@ -79,15 +79,15 @@ module Properties where
   progress :
     ∀ {n} {Γ : Ctxt n} {e₁ : Expr n} {τ} →
     Γ ⊢ e₁ ⦂ τ →
-    Dec (∃[ e₂ ] (e₁ ⟶ e₂))
+    Dec (∃[ e₂ ] (e₁ ⟶ᵇ e₂))
   progress (start i) = no λ ()
   progress (abstr Γx⊢e) with progress Γx⊢e
   ... | yes (e' , e→e') = yes (λ̂ e' , λ̂-red e→e')
   ... | no ¬e→ = no λ (_ , λe→) → ¬e→ (lemma λe→)  where
     lemma :
       ∀ {n} {e₁ : Expr (suc n)} {e₂ : Expr n} →
-      (λ̂ e₁) ⟶ e₂ →
-      ∃[ e ] (e₁ ⟶ e)
+      (λ̂ e₁) ⟶ᵇ e₂ →
+      ∃[ e ] (e₁ ⟶ᵇ e)
     lemma (λ̂-red {e₂ = e} e₁→e) = e , e₁→e
   progress (app Γ⊢e₁ Γ⊢e₂) with progress Γ⊢e₁
   progress (app {e₂ = e₂} Γ⊢e₁ Γ⊢e₂)
@@ -102,8 +102,8 @@ module Properties where
     | no ¬e₂→ = no λ (_ , ve→) → ¬e₂→ (lemma ve→) where
       lemma :
         ∀ {n} {e₁ e₂ : Expr n} {i : Fin n} →
-        (𝑣 i · e₁) ⟶ e₂ →
-        ∃[ e ] (e₁ ⟶ e)
+        (𝑣 i · e₁) ⟶ᵇ e₂ →
+        ∃[ e ] (e₁ ⟶ᵇ e)
       lemma (·ʳ-red {e₂ = e} e₁→e) = e , e₁→e
   progress {e₁ = λ̂ e₁ · e₂} (app Γ⊢e₁ Γ⊢e₂)
     | no _
@@ -114,8 +114,8 @@ module Properties where
       no λ ∃e₁e₂e₃→ → [ ¬e₁e₂→ , ¬e₃→ ] (lemma ∃e₁e₂e₃→) where
         lemma :
           ∀ {n} {e₁ e₂ e₃ : Expr n} →
-          ∃[ e ] ((e₁ · e₂) · e₃ ⟶ e) →
-          ∃[ e ] ((e₁ · e₂) ⟶ e) ⊎ ∃[ e ] (e₃ ⟶ e)
+          ∃[ e ] ((e₁ · e₂) · e₃ ⟶ᵇ e) →
+          ∃[ e ] ((e₁ · e₂) ⟶ᵇ e) ⊎ ∃[ e ] (e₃ ⟶ᵇ e)
         lemma ((e · _) , ·ˡ-red e₁e₂→e) = inj₁ (e , e₁e₂→e)
         lemma (((_ · _) · e) , ·ʳ-red e₃→e) = inj₂ (e , e₃→e)
 
@@ -124,7 +124,7 @@ module Properties where
     (Δ ++ Γ) ⊢ e ⦂ τ →
     (Δ ++ τ' ∷ Γ) ⊢ shift m 1 e ⦂ τ
   thinning {m = m} {Δ = Δ} {Γ = Γ} {τ' = τ'} (start i)
-    rewrite lookup-shift τ' Δ Γ i = start (Fin.shift m 1 i)
+    rewrite sym (lookup-shift τ' Δ Γ i) = start (Fin.shift m 1 i)
   thinning {Δ = Δ} {τ = t₁ →̂ _} (abstr ΔΓ⊢e) = abstr (thinning {Δ = t₁ ∷ Δ} ΔΓ⊢e)
   thinning (app ΔΓ⊢e₁ ΔΓ⊢e₂) = app (thinning ΔΓ⊢e₁) (thinning ΔΓ⊢e₂)
 
@@ -162,7 +162,7 @@ module Properties where
 
   preservation :
     ∀ {n} {Γ : Ctxt n} {e₁ e₂ : Expr n} {τ} →
-    e₁ ⟶ e₂ →
+    e₁ ⟶ᵇ e₂ →
     Γ ⊢ e₁ ⦂ τ →
     Γ ⊢ e₂ ⦂ τ
   preservation {n} {Γ} {τ} (β-red e₁ e₂) (app (abstr Γx⊢e₁) Γ⊢e₂) = substitution₁ Γx⊢e₁ Γ⊢e₂
