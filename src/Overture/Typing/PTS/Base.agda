@@ -53,12 +53,12 @@ e₁ /⁰ e₂ = e₁ / (e₂ ∷ vars)
 infix 15 _⟶ᵇ_
 data _⟶ᵇ_ : Rel (Expr n) ℓ0 where
   β-rule :
-    ∀ {a : Expr n} {b : Expr (suc n)} c →
+    ∀ {a : Expr n} (b : Expr (suc n)) (c) →
     (λ̂ a · b) § c ⟶ᵇ b /⁰ c
   comp-Πˡ :
     ∀ {a a' : Expr n} {b : Expr (suc n)} →
     a ⟶ᵇ a' →
-    Π a · b ⟶ᵇ Π a · b
+    Π a · b ⟶ᵇ Π a' · b
   comp-Πʳ :
     ∀ {a : Expr n} {b b' : Expr (suc n)} →
     b ⟶ᵇ b' →
@@ -75,7 +75,7 @@ data _⟶ᵇ_ : Rel (Expr n) ℓ0 where
     ∀ {a a' b : Expr n} →
     a ⟶ᵇ a' →
     a § b ⟶ᵇ a' § b
-  comp-app₂ :
+  comp-§ʳ :
     ∀ {a b b' : Expr n} →
     b ⟶ᵇ b' →
     a § b ⟶ᵇ a § b'
@@ -197,14 +197,25 @@ module Properties where
     (a : Expr (suc (m + n)))
     (b : Expr (m + n)) →
     Expr.shift m 1 (a /⁰ b) ≡ Expr.shift (suc m) 1 a /⁰ Expr.shift m 1 b
-  lemma3 = {!!}
+  lemma3 (𝑠 i) _ = refl
+  lemma3 (𝑣 zero) b = refl
+  lemma3 (𝑣 (suc i)) b = {!refl!}
+  lemma3 (λ̂ a · a₁) b = {!!}
+  lemma3 (Π a · a₁) b = {!!}
+  lemma3 (a § a₁) b = {!!}
 
   lemma4 :
     {a : Expr (m + n)}
     {b : Expr (m + n)} →
     a ⟶ᵇ b →
     Expr.shift m 1 a ⟶ᵇ Expr.shift m 1 b
-  lemma4 = {!!}
+  lemma4 {m} (β-rule b c) rewrite lemma3 {m} b c = β-rule (Expr.shift (suc m) 1 b) (Expr.shift m 1 c)
+  lemma4 (comp-Πˡ a→) = comp-Πˡ (lemma4 a→)
+  lemma4 (comp-Πʳ b→) = comp-Πʳ (lemma4 b→)
+  lemma4 (comp-λˡ a→) = comp-λˡ (lemma4 a→)
+  lemma4 (comp-λʳ b→) = comp-λʳ (lemma4 b→)
+  lemma4 (comp-§ˡ a→) = comp-§ˡ (lemma4 a→)
+  lemma4 (comp-§ʳ b→) = comp-§ʳ (lemma4 b→)
 
   thinning wf-cΓ (axiom ax wf-ΔΓ) =
     axiom ax (ctxt-thinning wf-ΔΓ wf-cΓ)
