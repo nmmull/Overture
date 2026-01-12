@@ -2,11 +2,12 @@ module Overture.Data.PVec.Base where
 
 open import Level using (Level)
 open import Data.Fin using (Fin; zero; suc; toℕ; opposite)
-open import Data.Fin.Properties using (toℕ-fromℕ; toℕ-inject₁)
+open import Data.Fin.Properties using (toℕ-fromℕ; toℕ-inject₁; opposite-involutive)
 open import Data.Nat using (ℕ; zero; suc; _+_)
 open import Data.Product using (_,_; ∃-syntax)
 open import Data.Vec using (Vec; []; _∷_)
 open import Relation.Unary using (Pred)
+open import Relation.Binary.PropositionalEquality
 
 private
   variable
@@ -39,6 +40,9 @@ tail (_ ∷ xs) = xs
 lookup : ∀ {P : Pred ℕ ℓ} → PVec P n → (i : Fin n) → P (toℕ (opposite i))
 lookup {n = suc n} (x ∷ _) zero rewrite toℕ-fromℕ n = x
 lookup (_ ∷ xs) (suc i) rewrite toℕ-inject₁ (opposite i) = lookup xs i
+
+lookup-rev : ∀ {P : Pred ℕ ℓ} → PVec P n → (i : Fin n) → P (toℕ i)
+lookup-rev {P = P} v i rewrite sym (opposite-involutive i) = lookup v (opposite i)
 
 ------------------------------------------------------------------------
 -- Operations for transforming vectors

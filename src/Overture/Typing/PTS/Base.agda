@@ -3,15 +3,18 @@ open import Overture.Typing.PTS.Specification using (Spec)
 module Overture.Typing.PTS.Base (𝒮 : Spec) where
 
 open import Overture.Data.Fin as Fin using (Fin; zero; suc; toℕ; opposite)
-open import Overture.Data.Fin.Properties using (toℕ-fromℕ; toℕ-inject₁; toℕ-opposite)
+open import Overture.Data.Fin.Properties using (toℕ-fromℕ; toℕ-inject₁; toℕ-suc-opposite)
 open import Data.Fin.Substitution using (Sub)
-open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Nat using (ℕ; zero; suc; _+_)
+open import Data.Nat.Properties using (+-suc)
 open import Overture.Data.PVec as PVec using (PVec; PVecExt; []; _∷_; _++_)
 open import Data.Vec as Vec using (Vec; []; _∷_)
+open import Data.Vec.Properties using (lookup-map; lookup-allFin)
 open import Relation.Unary using (Pred)
 open import Relation.Binary using (Rel)
 open import Level renaming (zero to ℓ0) using (Level)
 open import Relation.Binary.PropositionalEquality
+open Relation.Binary.PropositionalEquality.≡-Reasoning
 
 private
   variable
@@ -28,14 +31,27 @@ module Expr where
     Π_·_ : Expr n → Expr (suc n) → Expr n
     _§_ : Expr n → Expr n → Expr n
 
-  shift : ∀ m p → Expr (m + n) → Expr (m + (p + n))
-  shift m p (𝑠 i) = 𝑠 i
-  shift m p (𝑣 i) = 𝑣 (Fin.shift m p i)
-  shift m p (λ̂ a · b) =  λ̂ (shift m p a) · (shift (suc m) p b)
-  shift m p (Π a · b) = Π (shift m p a) · (shift (suc m) p b)
-  shift m p (a § b) = (shift m p a) § (shift m p b)
+  _↑ˡ_ : Expr m → ∀ n → Expr (m + n)
+  𝑠 i ↑ˡ n = 𝑠 i
+  𝑣 i ↑ˡ n = 𝑣 (i Fin.↑ˡ n)
+  (λ̂ a · b) ↑ˡ n = λ̂ (a ↑ˡ n) · (b ↑ˡ n)
+  (Π a · b) ↑ˡ n = Π (a ↑ˡ n) · (b ↑ˡ n)
+  (a § b) ↑ˡ n = (a ↑ˡ n) § (b ↑ˡ n)
 
-open Expr hiding (shift)
+  shift : ∀ m p n → Expr (m + n) → Expr (m + (p + n))
+  shift m p n (𝑠 i) = 𝑠 i
+  shift m p n (𝑣 i) = 𝑣 (Fin.shift m p n i)
+  shift m p n (λ̂ a · b) =  λ̂ (shift m p n a) · (shift (suc m) p n b)
+  shift m p n (Π a · b) = Π (shift m p n a) · (shift (suc m) p n b)
+  shift m p n (a § b) = (shift m p n a) § (shift m p n b)
+
+  _↑ʳ_ : ∀ n → Expr m → Expr (n + m)
+  _↑ʳ_ {m = m} n e = shift 0 n m e
+
+  inject₁ : Expr n → Expr (suc n)
+  inject₁ e = 1 ↑ʳ e
+
+open Expr hiding (shift; inject₁)
 
 _/_ : Expr m → Sub Expr m n → Expr n
 𝑠 i / ρ = 𝑠 i
@@ -46,6 +62,11 @@ _/_ : Expr m → Sub Expr m n → Expr n
 
 vars : Sub Expr n n
 vars {n} = Vec.map 𝑣 (Vec.allFin n)
+
+lookup-vars : ∀ {n} (i : Fin n) → Vec.lookup vars i ≡ 𝑣 i
+lookup-vars {n} i
+  rewrite lookup-map i 𝑣 (Vec.allFin n)
+  rewrite lookup-allFin i = refl
 
 _/⁰_ : Expr (suc n) → Expr n → Expr n
 e₁ /⁰ e₂ = e₁ / (e₂ ∷ vars)
@@ -80,6 +101,8 @@ data _⟶ᵇ_ : Rel (Expr n) ℓ0 where
     b ⟶ᵇ b' →
     a § b ⟶ᵇ a § b'
 
+module CtxtTwo where
+
 module Ctxt where
   Ctxt : ℕ → Set
   Ctxt n = PVec Expr n
@@ -88,13 +111,21 @@ module Ctxt where
   CtxtExt m n = PVecExt Expr m n
 
   lookup : Ctxt n → Fin n → Expr n
-  lookup {n = suc n} Γ i =
+  lookup Γ i =
     resp Expr
-      (cong suc (toℕ-opposite i)) (Expr.shift 0 (suc (toℕ i))
-      (PVec.lookup Γ i))
+      (toℕ-suc-opposite i)
+      ((PVec.lookup-rev Γ i) Expr.↑ˡ (suc (toℕ (opposite i))))
 
   shift : ∀ k → CtxtExt n m → CtxtExt (k + n) m
-  shift k = PVec.map (λ i → Expr.shift i k)
+  shift {n} k = PVec.map (λ i e → Expr.shift i k e)
+
+  -- lemma-7 :
+  --   (i : Fin (m + n))
+  --   (c : Expr n)
+  --   (Δ : CtxtExt n m)
+  --   (Γ : Ctxt n) →
+  --   PVec.lookup (shift 1 Δ ++ (c ∷ Γ)) (Fin.shift m 1 i) ≡ Expr.shift m 1 (PVec.lookup (Δ ++ Γ) i)
+  -- lemma-7 = {!!}
 
   lookup-shift :
     (i : Fin (m + n))
@@ -102,9 +133,10 @@ module Ctxt where
     (Δ : CtxtExt n m)
     (Γ : Ctxt n) →
     lookup (shift 1 Δ ++ (c ∷ Γ)) (Fin.shift m 1 i) ≡ Expr.shift m 1 (lookup (Δ ++ Γ) i)
-  lookup-shift {.ℕ.zero} {.(suc _)} zero c [] Γ = {!!}
-  lookup-shift {.ℕ.zero} {.(suc _)} (suc i) c [] Γ = {!!}
-  lookup-shift {.(suc _)} {n} i c (x ∷ Δ) Γ = {!!}
+  lookup-shift i c Δ Γ = {!!}
+  -- lookup-shift {.ℕ.zero} {.(suc _)} zero c [] Γ = {!!}
+  -- lookup-shift {.ℕ.zero} {.(suc _)} (suc i) c [] Γ = {!!}
+  -- lookup-shift {.(suc _)} {n} i c (x ∷ Δ) Γ = {!!}
 
 
 open Ctxt hiding (lookup; shift)
@@ -193,29 +225,40 @@ module Properties where
     Ctxt.lookup (Ctxt.shift 1 Δ ++ (c ∷ Γ)) (Fin.shift m 1 i) ≡ Expr.shift m 1 (Ctxt.lookup (Δ ++ Γ) i)
   lemma2 = {!!}
 
+  lemma5 :
+    (i : Fin n)
+    (b : Expr n) →
+    𝑣 (suc i) /⁰ b ≡ 𝑣 i
+  lemma5 i b = lookup-vars i
+
   lemma3 :
     (a : Expr (suc (m + n)))
     (b : Expr (m + n)) →
     Expr.shift m 1 (a /⁰ b) ≡ Expr.shift (suc m) 1 a /⁰ Expr.shift m 1 b
   lemma3 (𝑠 i) _ = refl
   lemma3 (𝑣 zero) b = refl
-  lemma3 (𝑣 (suc i)) b = {!refl!}
-  lemma3 (λ̂ a · a₁) b = {!!}
+  lemma3 {m} (𝑣 (suc i)) b rewrite lemma5 i b = sym (lookup-vars (Fin.shift m 1 i))
+  lemma3 {m} (λ̂ a · b) c
+    rewrite lemma3 {m} a c =
+    {!!}
   lemma3 (Π a · a₁) b = {!!}
-  lemma3 (a § a₁) b = {!!}
+  lemma3 {m} (a § b) c
+    rewrite lemma3 {m} a c
+    rewrite lemma3 {m} b c =
+    refl
 
-  lemma4 :
+  shift-red :
     {a : Expr (m + n)}
     {b : Expr (m + n)} →
     a ⟶ᵇ b →
     Expr.shift m 1 a ⟶ᵇ Expr.shift m 1 b
-  lemma4 {m} (β-rule b c) rewrite lemma3 {m} b c = β-rule (Expr.shift (suc m) 1 b) (Expr.shift m 1 c)
-  lemma4 (comp-Πˡ a→) = comp-Πˡ (lemma4 a→)
-  lemma4 (comp-Πʳ b→) = comp-Πʳ (lemma4 b→)
-  lemma4 (comp-λˡ a→) = comp-λˡ (lemma4 a→)
-  lemma4 (comp-λʳ b→) = comp-λʳ (lemma4 b→)
-  lemma4 (comp-§ˡ a→) = comp-§ˡ (lemma4 a→)
-  lemma4 (comp-§ʳ b→) = comp-§ʳ (lemma4 b→)
+  shift-red {m} (β-rule b c) rewrite lemma3 {m} b c = β-rule (Expr.shift (suc m) 1 b) (Expr.shift m 1 c)
+  shift-red (comp-Πˡ a→) = comp-Πˡ (shift-red a→)
+  shift-red (comp-Πʳ b→) = comp-Πʳ (shift-red b→)
+  shift-red (comp-λˡ a→) = comp-λˡ (shift-red a→)
+  shift-red (comp-λʳ b→) = comp-λʳ (shift-red b→)
+  shift-red (comp-§ˡ a→) = comp-§ˡ (shift-red a→)
+  shift-red (comp-§ʳ b→) = comp-§ʳ (shift-red b→)
 
   thinning wf-cΓ (axiom ax wf-ΔΓ) =
     axiom ax (ctxt-thinning wf-ΔΓ wf-cΓ)
@@ -230,9 +273,9 @@ module Properties where
     rewrite lemma3 {m} {n} d b =
     app (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢b)
   thinning wf-cΓ (conv-red ⊢a ⊢c red) =
-    conv-red (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢c) (lemma4 red)
+    conv-red (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢c) (shift-red red)
   thinning wf-cΓ (conv-exp ⊢a ⊢c exp) =
-    conv-exp (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢c) (lemma4 exp)
+    conv-exp (thinning wf-cΓ ⊢a) (thinning wf-cΓ ⊢c) (shift-red exp)
 
   substitution :
     {a b : Expr m}
