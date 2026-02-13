@@ -1,4 +1,4 @@
-module Overture.Typing.PTS.Specification where
+module Overture.TypeTheory.PTS.Specification where
 
 open import Relation.Binary.PropositionalEquality
 open import Data.Product using (_×_)

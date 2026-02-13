@@ -1,6 +1,6 @@
-open import Overture.Typing.PTS.Specification using (Spec)
+open import Overture.TypeTheory.PTS.Specification using (Spec)
 
-module Overture.Typing.PTS.Base (𝒮 : Spec) where
+module Overture.TypeTheory.PTS.Base (𝒮 : Spec) where
 
 open import Overture.Data.Fin as Fin using (Fin; zero; suc; toℕ; opposite)
 open import Overture.Data.Fin.Properties using (toℕ-fromℕ; toℕ-inject₁; toℕ-suc-opposite)

@@ -1,4 +1,4 @@
-module Overture.Typing.STLC where
+module Overture.TypeTheory.STLC where
 
 open import Overture.Data.Fin as Fin using (Fin; zero; suc)
 open import Data.Fin.Substitution using (Sub)
